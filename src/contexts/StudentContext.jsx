@@ -88,11 +88,22 @@ export const StudentProvider = ({ children }) => {
   const getStudentProgress = async (studentId) => {
     try {
       if (DEMO_MODE) {
+        // Calculer la progression basée sur l'historique d'apprentissage
+        const correctAnswers = mockStudent.learning_history ? 
+          mockStudent.learning_history.filter(h => h.evaluation).length : 0;
+        const totalAnswers = mockStudent.learning_history ? 
+          mockStudent.learning_history.length : 0;
+        
+        const completionPercentage = totalAnswers > 0 ? 
+          Math.round((correctAnswers / Math.max(totalAnswers, 10)) * 100) : 0;
+        
         return {
-          level: 3,
-          completed: 75,
+          level: mockStudent.level || 3,
+          completed: Math.min(completionPercentage, 100),
           current_objective: 'Équations du second degré',
-          objectives_completed: ['Équations linéaires', 'Systèmes d\'équations']
+          objectives_completed: correctAnswers >= 3 ? 
+            ['Équations linéaires', 'Systèmes d\'équations'] : 
+            correctAnswers >= 1 ? ['Équations linéaires'] : []
         };
       } else {
         const response = await api.get(`/students/${studentId}/progress`);
@@ -112,15 +123,81 @@ export const StudentProvider = ({ children }) => {
     setCurrentStudent(null);
   };
 
+  const updateStudentName = async (studentId, newName) => {
+    try {
+      if (DEMO_MODE) {
+        // En mode démo, on met à jour localement
+        if (currentStudent && currentStudent.student_id === studentId) {
+          const updatedStudent = { ...currentStudent, name: newName };
+          setCurrentStudent(updatedStudent);
+          return updatedStudent;
+        }
+      } else {
+        // En mode réel, on ferait un appel API PUT/PATCH ici
+        // Pour l'instant, on met à jour localement car l'endpoint n'existe pas
+        if (currentStudent && currentStudent.student_id === studentId) {
+          const updatedStudent = { ...currentStudent, name: newName };
+          setCurrentStudent(updatedStudent);
+          return updatedStudent;
+        }
+      }
+    } catch (error) {
+      console.error('Error updating student name:', error);
+      throw error;
+    }
+  };
+const updateStudentData = async (updatedStudent) => {
+  try {
+    // Mettre à jour l'état local
+    setCurrentStudent(updatedStudent);
+    
+    // Optionnel: sauvegarder sur le serveur si vous avez un endpoint pour ça
+    if (!DEMO_MODE) {
+      // await api.put(`/students/${updatedStudent.student_id}`, updatedStudent);
+    }
+    
+    // Mettre à jour le localStorage pour la persistance
+    localStorage.setItem('currentStudent', JSON.stringify(updatedStudent));
+    
+    return updatedStudent;
+  } catch (error) {
+    console.error('Error updating student data:', error);
+    throw error;
+  }
+};
+
+const refreshStudentData = async (studentId) => {
+  try {
+    if (DEMO_MODE) {
+      // En mode démo, utiliser les données mockées mises à jour
+      setCurrentStudent(mockStudent);
+      return mockStudent;
+    } else {
+      // Recharger depuis le serveur
+      const response = await api.get(`/students/${studentId}`);
+      const studentData = response.data;
+      setCurrentStudent(studentData);
+      localStorage.setItem('currentStudent', JSON.stringify(studentData));
+      return studentData;
+    }
+  } catch (error) {
+    console.error('Error refreshing student data:', error);
+    throw error;
+  }
+};
+
   const value = {
     currentStudent,
     students,
     loading,
     createStudent,
     loadStudent,
+    updateStudentData,
+    refreshStudentData,
     getStudentProgress,
     selectStudent,
     clearStudent,
+    updateStudentName,
   };
 
   return (

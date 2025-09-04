@@ -12,6 +12,7 @@ import StudentProfile from '@/pages/StudentProfile';
 import Exercise from '@/pages/Exercise';
 import Progress from '@/pages/Progress';
 import Welcome from '@/pages/Welcome';
+import SystemStats from '@/pages/SystemStats';
 
 // Components
 import Navbar from '@/components/Navbar';
@@ -60,6 +61,7 @@ function App() {
                         <Route path="/profile" element={<StudentProfile />} />
                         <Route path="/exercise" element={<Exercise />} />
                         <Route path="/progress" element={<Progress />} />
+                        <Route path="/stats" element={<SystemStats />} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                       </Routes>
                     </main>

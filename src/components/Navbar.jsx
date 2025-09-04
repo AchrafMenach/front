@@ -9,7 +9,8 @@ import {
   Moon, 
   Sun, 
   LogOut,
-  Brain
+  Brain,
+  BarChart3
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/theme-provider';
@@ -25,6 +26,7 @@ const Navbar = () => {
     { path: '/profile', icon: User, label: 'Profil' },
     { path: '/exercise', icon: BookOpen, label: 'Exercices' },
     { path: '/progress', icon: TrendingUp, label: 'Progression' },
+    { path: '/stats', icon: BarChart3, label: 'Statistiques' },
   ];
 
   const toggleTheme = () => {

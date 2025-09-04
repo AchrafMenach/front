@@ -10,11 +10,14 @@ import {
   Activity,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  Zap,
+  ArrowUp
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   LineChart, 
@@ -31,11 +34,21 @@ import {
 } from 'recharts';
 import { useStudent } from '@/contexts/StudentContext';
 import { useApi } from '@/contexts/ApiContext';
+import { useProgression } from '@/hooks/useProgression';
 import { AutoMathRenderer } from '@/components/MathRenderer';
+import ProgressionNotification from '@/components/ProgressionNotification';
 
 const ProgressPage = () => {
   const { currentStudent, getStudentProgress } = useStudent();
   const { getLearningObjectives, getCurrentObjectiveInfo } = useApi();
+  const {
+    progressionStatus,
+    showNotification,
+    progressionData,
+    advanceStudent,
+    hideNotification,
+    loading: progressionLoading
+  } = useProgression();
   
   const [progress, setProgress] = useState(null);
   const [objectives, setObjectives] = useState(null);
@@ -48,21 +61,15 @@ const ProgressPage = () => {
       
       setLoading(true);
       try {
-        const [progressData, objectivesData, objectiveInfoData] = await Promise.allSettled([
+        const [progressData, objectivesData, objectiveInfoData] = await Promise.all([
           getStudentProgress(currentStudent.student_id),
           getLearningObjectives(),
           getCurrentObjectiveInfo(currentStudent.student_id)
         ]);
-
-        if (progressData.status === 'fulfilled') {
-          setProgress(progressData.value);
-        }
-        if (objectivesData.status === 'fulfilled') {
-          setObjectives(objectivesData.value);
-        }
-        if (objectiveInfoData.status === 'fulfilled') {
-          setObjectiveInfo(objectiveInfoData.value);
-        }
+        
+        setProgress(progressData);
+        setObjectives(objectivesData);
+        setObjectiveInfo(objectiveInfoData);
       } catch (error) {
         console.error('Error loading progress data:', error);
       } finally {
@@ -71,7 +78,20 @@ const ProgressPage = () => {
     };
 
     loadProgressData();
-  }, [currentStudent]);
+    
+    const interval = setInterval(loadProgressData, 30000);
+    
+    const handleProgressUpdate = () => {
+      loadProgressData();
+    };
+    
+    window.addEventListener('studentProgressUpdated', handleProgressUpdate);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('studentProgressUpdated', handleProgressUpdate);
+    };
+  }, [currentStudent, getStudentProgress, getLearningObjectives, getCurrentObjectiveInfo]);
 
   if (!currentStudent) {
     return <div>Chargement...</div>;
@@ -103,8 +123,26 @@ const ProgressPage = () => {
     description: objectives.objectives[objKey]?.description || ''
   })) : [];
 
+  const handleAdvanceManually = async () => {
+    await advanceStudent();
+  };
+
+  const handleCelebrate = () => {
+    hideNotification();
+    // Optionnel: faire défiler vers la section des objectifs
+    document.getElementById('objectives-section')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
+      {/* Notification de progression */}
+      <ProgressionNotification
+        progressionData={progressionData}
+        show={showNotification}
+        onCelebrate={handleCelebrate}
+        onContinue={hideNotification}
+      />
+
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -184,6 +222,56 @@ const ProgressPage = () => {
         </Card>
       </motion.div>
 
+      {/* Statut de progression avec bouton d'avancement */}
+      {progressionStatus && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, duration: 0.5 }}
+        >
+          <Card className={`${progressionStatus.ready_to_advance 
+            ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-800/20 border-green-200 dark:border-green-700' 
+            : 'bg-gray-50 dark:bg-gray-800'
+          }`}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Zap className={`w-5 h-5 ${progressionStatus.ready_to_advance ? 'text-green-500' : 'text-gray-400'}`} />
+                    <h3 className="font-semibold">
+                      {progressionStatus.ready_to_advance 
+                        ? 'Prêt pour la progression!' 
+                        : 'Continuez vos efforts'}
+                    </h3>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                    Taux de réussite récent: {progressionStatus.recent_success_rate}%
+                  </p>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span>Progression vers l'objectif suivant</span>
+                    <span>{progressionStatus.progress_percentage}%</span>
+                  </div>
+                  <Progress value={progressionStatus.progress_percentage} className="h-2" />
+                </div>
+                
+                {progressionStatus.ready_to_advance && progressionStatus.next_objective && (
+                  <div className="ml-6">
+                    <Button 
+                      onClick={handleAdvanceManually}
+                      disabled={progressionLoading}
+                      className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
+                    >
+                      <ArrowUp className="w-4 h-4 mr-2" />
+                      Passer à: {progressionStatus.next_objective}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
       {/* Main Content */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -213,9 +301,9 @@ const ProgressPage = () => {
                   <div>
                     <div className="flex justify-between text-sm mb-2">
                       <span>Progression Générale</span>
-                      <span>{progress?.completed || 0}%</span>
+                      <span>{progressionStatus?.progress_percentage || progress?.completed || 0}%</span>
                     </div>
-                    <Progress value={progress?.completed || 0} className="h-3" />
+                    <Progress value={progressionStatus?.progress_percentage || progress?.completed || 0} className="h-3" />
                   </div>
                   
                   {objectiveInfo && (
@@ -232,6 +320,37 @@ const ProgressPage = () => {
                           className="text-sm text-gray-600 dark:text-gray-300"
                         />
                       )}
+                    </div>
+                  )}
+
+                  {/* Statut de préparation pour la progression */}
+                  {progressionStatus && (
+                    <div className={`p-3 rounded-lg border-2 ${
+                      progressionStatus.ready_to_advance
+                        ? 'border-green-300 bg-green-50 dark:bg-green-900/20'
+                        : 'border-yellow-300 bg-yellow-50 dark:bg-yellow-900/20'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className={`text-sm font-medium ${
+                            progressionStatus.ready_to_advance
+                              ? 'text-green-700 dark:text-green-300'
+                              : 'text-yellow-700 dark:text-yellow-300'
+                          }`}>
+                            {progressionStatus.ready_to_advance
+                              ? '✅ Prêt pour l\'objectif suivant'
+                              : '⏳ Continuez à pratiquer'}
+                          </p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            Taux récent: {progressionStatus.recent_success_rate}%
+                          </p>
+                        </div>
+                        {progressionStatus.next_objective && (
+                          <Badge variant="outline" className="text-xs">
+                            Suivant: {progressionStatus.next_objective}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   )}
                 </CardContent>
@@ -275,7 +394,7 @@ const ProgressPage = () => {
           </TabsContent>
 
           {/* Objectives Tab */}
-          <TabsContent value="objectives" className="space-y-6">
+          <TabsContent value="objectives" className="space-y-6" id="objectives-section">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
@@ -321,9 +440,57 @@ const ProgressPage = () => {
                           className="text-sm text-gray-600 dark:text-gray-300"
                         />
                       )}
+                      
+                      {/* Indicateur de progression pour l'objectif actuel */}
+                      {objective.current && progressionStatus && (
+                        <div className="mt-3 pt-3 border-t border-blue-200">
+                          <div className="flex items-center justify-between text-sm mb-2">
+                            <span>Progression vers l'objectif suivant</span>
+                            <span>{progressionStatus.recent_success_rate}% réussite</span>
+                          </div>
+                          <Progress 
+                            value={progressionStatus.recent_success_rate} 
+                            className="h-2"
+                          />
+                          {progressionStatus.ready_to_advance && (
+                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                              🎉 Prêt pour passer à l'objectif suivant!
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </motion.div>
                   ))}
                 </div>
+
+                {/* Résumé de progression globale */}
+                {progressionStatus && (
+                  <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg">
+                    <h4 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
+                      Résumé de Progression
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <p className="text-gray-600 dark:text-gray-400">Objectifs complétés</p>
+                        <p className="font-bold text-purple-600 dark:text-purple-400">
+                          {progressionStatus.completed_objectives} / {progressionStatus.total_objectives}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600 dark:text-gray-400">Niveau actuel</p>
+                        <p className="font-bold text-purple-600 dark:text-purple-400">
+                          Niveau {progressionStatus.current_level}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600 dark:text-gray-400">Progression globale</p>
+                        <p className="font-bold text-purple-600 dark:text-purple-400">
+                          {progressionStatus.progress_percentage}%
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -467,11 +634,33 @@ const ProgressPage = () => {
                     </div>
                     <div className="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                       <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                        {successRate}%
+                        {progressionStatus?.recent_success_rate || successRate}%
                       </p>
                       <p className="text-sm text-orange-500">Taux Réussite</p>
                     </div>
                   </div>
+
+                  {/* Progression vers l'objectif suivant */}
+                  {progressionStatus && progressionStatus.next_objective && (
+                    <div className="mt-4 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 rounded-lg border border-yellow-200 dark:border-yellow-700">
+                      <h4 className="font-semibold text-yellow-700 dark:text-yellow-300 mb-2">
+                        Prochain Objectif
+                      </h4>
+                      <p className="text-sm text-yellow-600 dark:text-yellow-400 mb-2">
+                        {progressionStatus.next_objective}
+                      </p>
+                      <div className="flex items-center justify-between text-sm">
+                        <span>Préparation</span>
+                        <span className={progressionStatus.ready_to_advance ? 'text-green-600' : 'text-yellow-600'}>
+                          {progressionStatus.ready_to_advance ? 'Prêt!' : 'En cours...'}
+                        </span>
+                      </div>
+                      <Progress 
+                        value={progressionStatus.ready_to_advance ? 100 : progressionStatus.recent_success_rate} 
+                        className="h-2 mt-2"
+                      />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -483,4 +672,3 @@ const ProgressPage = () => {
 };
 
 export default ProgressPage;
-

@@ -207,40 +207,6 @@ const Dashboard = () => {
           </Card>
         </motion.div>
       )}
-
-      {/* Coach Message */}
-      {coachMessage && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
-        >
-          <Card className="mb-6 bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 border-orange-200 dark:border-orange-700">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <MessageCircle className="w-5 h-5 text-orange-500" />
-                <span>Message de votre Coach</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <AutoMathRenderer 
-                  text={coachMessage.message}
-                  className="text-gray-700 dark:text-gray-300"
-                />
-                {coachMessage.motivation && (
-                  <div className="mt-3 p-3 bg-white/50 dark:bg-gray-800/50 rounded-lg">
-                    <p className="text-sm font-medium text-orange-600 dark:text-orange-400">
-                      💪 {coachMessage.motivation}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
-
       {/* Quick Actions */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}

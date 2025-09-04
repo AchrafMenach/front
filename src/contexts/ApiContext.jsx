@@ -13,7 +13,6 @@ export const useApi = () => {
 
 // Configuration de l'API
 const API_BASE_URL = 'http://localhost:8000';
-const DEMO_MODE = false; // Mode démo pour la présentation
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -22,34 +21,6 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
-
-// Mock data pour le mode démo
-const mockStudent = {
-  student_id: 'demo-student-001',
-  name: 'Alice Dupont',
-  level: 3,
-  current_objective: 'Équations du second degré',
-  objectives_completed: ['Équations linéaires', 'Systèmes d\'équations']
-};
-
-const mockExercise = {
-  exercise: 'Résolvez l\'équation du second degré suivante: $x^2 - 5x + 6 = 0$',
-  objective: 'Équations du second degré',
-  difficulty: 3,
-  context: 'Utilisez la méthode de factorisation ou la formule quadratique: $x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$'
-};
-
-const mockEvaluation = {
-  is_correct: true,
-  feedback: 'Excellente réponse ! Vous avez correctement identifié les deux solutions.',
-  explanation: 'L\'équation $x^2 - 5x + 6 = 0$ peut être factorisée comme $(x-2)(x-3) = 0$, donnant $x = 2$ ou $x = 3$.',
-  correct_answer: '$x = 2$ ou $x = 3$'
-};
-
-const mockCoachMessage = {
-  message: 'Félicitations Alice ! Vous progressez très bien dans les équations du second degré. Continuez sur cette lancée !',
-  motivation: 'Votre persévérance porte ses fruits. Vous maîtrisez de mieux en mieux les concepts mathématiques !'
-};
 
 // Intercepteurs pour gérer les erreurs globalement
 api.interceptors.response.use(
@@ -61,13 +32,8 @@ api.interceptors.response.use(
 );
 
 export const ApiProvider = ({ children }) => {
+  
   const generateExercise = async (studentId) => {
-    if (DEMO_MODE) {
-      // Simuler un délai d'API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return mockExercise;
-    }
-    
     try {
       const response = await api.post('/exercises/generate', { student_id: studentId });
       return response.data;
@@ -78,15 +44,6 @@ export const ApiProvider = ({ children }) => {
   };
 
   const generateSimilarExercise = async (originalExercise) => {
-    if (DEMO_MODE) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return {
-        ...mockExercise,
-        exercise: 'Résolvez l\'équation du second degré suivante: $x^2 - 7x + 12 = 0$',
-        context: 'Essayez de factoriser cette équation ou utilisez la formule quadratique.'
-      };
-    }
-    
     try {
       const response = await api.post('/exercises/similar', originalExercise);
       return response.data;
@@ -97,17 +54,6 @@ export const ApiProvider = ({ children }) => {
   };
 
   const evaluateAnswer = async (exercise, answer, studentId) => {
-    if (DEMO_MODE) {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const isCorrect = answer.toLowerCase().includes('2') && answer.toLowerCase().includes('3');
-      return {
-        ...mockEvaluation,
-        is_correct: isCorrect,
-        feedback: isCorrect ? mockEvaluation.feedback : 'Pas tout à fait. Vérifiez vos calculs et essayez à nouveau.',
-        explanation: isCorrect ? mockEvaluation.explanation : 'Rappelez-vous que pour $ax^2 + bx + c = 0$, vous pouvez utiliser la factorisation ou la formule quadratique.'
-      };
-    }
-    
     try {
       const response = await api.post('/exercises/evaluate', {
         exercise,
@@ -121,16 +67,43 @@ export const ApiProvider = ({ children }) => {
     }
   };
 
-  const evaluateFileAnswer = async (studentId, exercise, file) => {
-    if (DEMO_MODE) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      return {
-        ...mockEvaluation,
-        feedback: 'Votre fichier a été analysé. La solution présentée est correcte !',
-        explanation: 'Votre démarche écrite est claire et méthodique.'
-      };
+  const evaluateAnswerWithPersonalizedCoaching = async (exercise, answer, studentId) => {
+    try {
+      const response = await api.post('/exercises/evaluate-with-coaching', {
+        exercise,
+        answer,
+        student_id: studentId,
+      });
+      
+      // Log pour debug
+      console.log('API Response:', response.data);
+      console.log('API Response structure:', JSON.stringify(response.data, null, 2));
+      
+      // Assurez-vous de retourner response.data et non response
+      return response.data;
+    } catch (error) {
+      console.error('Error evaluating answer with personalized coaching:', error);
+      console.error('Error response:', error.response?.data);
+      throw error;
     }
-    
+  };
+
+  const getPersonalizedCoachingMessage = async (exercise, studentAnswer, studentId, evaluation = null) => {
+    try {
+      const response = await api.post('/coach/personalized-message', {
+        exercise,
+        student_answer: studentAnswer,
+        student_id: studentId,
+        evaluation
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting personalized coaching message:', error);
+      throw error;
+    }
+  };
+
+  const evaluateFileAnswer = async (studentId, exercise, file) => {
     try {
       const formData = new FormData();
       formData.append('student_id', studentId);
@@ -150,11 +123,6 @@ export const ApiProvider = ({ children }) => {
   };
 
   const getCoachMessage = async () => {
-    if (DEMO_MODE) {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      return mockCoachMessage;
-    }
-    
     try {
       const response = await api.get('/coach/message');
       return response.data;
@@ -165,18 +133,6 @@ export const ApiProvider = ({ children }) => {
   };
 
   const getLearningObjectives = async () => {
-    if (DEMO_MODE) {
-      return {
-        objectives: {
-          'Équations linéaires': { description: 'Résolution d\'équations du premier degré' },
-          'Systèmes d\'équations': { description: 'Résolution de systèmes d\'équations linéaires' },
-          'Équations du second degré': { description: 'Résolution d\'équations quadratiques' },
-          'Fonctions': { description: 'Étude des fonctions mathématiques' }
-        },
-        order: ['Équations linéaires', 'Systèmes d\'équations', 'Équations du second degré', 'Fonctions']
-      };
-    }
-    
     try {
       const response = await api.get('/objectives');
       return response.data;
@@ -187,12 +143,6 @@ export const ApiProvider = ({ children }) => {
   };
 
   const getCurrentObjectiveInfo = async (studentId) => {
-    if (DEMO_MODE) {
-      return {
-        description: 'Apprenez à résoudre les équations du second degré en utilisant différentes méthodes : factorisation, complétion du carré, et formule quadratique $x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$.'
-      };
-    }
-    
     try {
       const response = await api.get(`/objectives/${studentId}/current`);
       return response.data;
@@ -202,16 +152,99 @@ export const ApiProvider = ({ children }) => {
     }
   };
 
-  const getSystemStats = async () => {
-    if (DEMO_MODE) {
-      return {
-        students_count: 1,
-        objectives_available: 4,
-        llm_status: 'online',
-        system_version: '1.0.0'
-      };
+  const getProgressionStatus = async (studentId) => {
+    try {
+      const response = await api.get(`/students/${studentId}/progression-status`);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting progression status:', error);
+      throw error;
     }
-    
+  };
+
+  const advanceStudentObjective = async (studentId) => {
+    try {
+      const response = await api.post(`/students/${studentId}/advance-objective`);
+      return response.data;
+    } catch (error) {
+      console.error('Error advancing student objective:', error);
+      throw error;
+    }
+  };
+
+  const checkObjectiveCompletion = async (studentId) => {
+    try {
+      const response = await api.get(`/students/${studentId}/check-completion`);
+      return response.data;
+    } catch (error) {
+      console.error('Error checking objective completion:', error);
+      throw error;
+    }
+  };
+
+  const getAvailableTestObjectives = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/level-test/objectives`);
+      if (!response.ok) {
+        throw new Error(`Erreur ${response.status}: ${response.statusText}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Erreur lors de la récupération des objectifs de test:', error);
+      throw error;
+    }
+  };
+
+  const generateLevelTest = async (objectives, questionsPerObjective = 2, maxLevelPerObjective = 3) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/level-test/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          objectives,
+          questions_per_objective: questionsPerObjective,
+          max_level_per_objective: maxLevelPerObjective
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Erreur lors de la génération du test de niveau:', error);
+      throw error;
+    }
+  };
+
+  const submitLevelTest = async (studentId, responses) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/level-test/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          student_id: studentId,
+          responses
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Erreur lors de la soumission du test de niveau:', error);
+      throw error;
+    }
+  };
+
+  const getSystemStats = async () => {
     try {
       const response = await api.get('/stats');
       return response.data;
@@ -223,16 +256,33 @@ export const ApiProvider = ({ children }) => {
 
   const value = {
     api,
+    // Génération d'exercices
     generateExercise,
     generateSimilarExercise,
+    
+    // Évaluation
     evaluateAnswer,
+    evaluateAnswerWithPersonalizedCoaching,
     evaluateFileAnswer,
+    
+    // Coaching personnalisé
+    getPersonalizedCoachingMessage,
     getCoachMessage,
+    
+    // Progression et objectifs
+    getProgressionStatus,
+    advanceStudentObjective, 
+    checkObjectiveCompletion,
     getLearningObjectives,
     getCurrentObjectiveInfo,
-    getSystemStats,
-    DEMO_MODE,
-    mockStudent
+    
+    // Test de niveau
+    getAvailableTestObjectives,
+    generateLevelTest,
+    submitLevelTest,
+    
+    // Statistiques
+    getSystemStats
   };
 
   return (
@@ -241,4 +291,3 @@ export const ApiProvider = ({ children }) => {
     </ApiContext.Provider>
   );
 };
-

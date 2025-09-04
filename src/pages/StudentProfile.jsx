@@ -25,8 +25,8 @@ import { AutoMathRenderer } from '@/components/MathRenderer';
 import { useToast } from '@/hooks/use-toast';
 
 const StudentProfile = () => {
-  const { currentStudent, getStudentProgress } = useStudent();
-  const { getLearningObjectives, getCurrentObjectiveInfo } = useApi();
+  const { currentStudent, getStudentProgress, updateStudentName } = useStudent();
+  const { getLearningObjectives, getCurrentObjectiveInfo, getCoachMessage } = useApi();
   const { toast } = useToast();
   
   const [isEditing, setIsEditing] = useState(false);
@@ -34,6 +34,7 @@ const StudentProfile = () => {
   const [progress, setProgress] = useState(null);
   const [objectives, setObjectives] = useState(null);
   const [objectiveInfo, setObjectiveInfo] = useState(null);
+  const [coachMessage, setCoachMessage] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -48,10 +49,11 @@ const StudentProfile = () => {
       
       setLoading(true);
       try {
-        const [progressData, objectivesData, objectiveInfoData] = await Promise.allSettled([
+        const [progressData, objectivesData, objectiveInfoData, coachData] = await Promise.allSettled([
           getStudentProgress(currentStudent.student_id),
           getLearningObjectives(),
-          getCurrentObjectiveInfo(currentStudent.student_id)
+          getCurrentObjectiveInfo(currentStudent.student_id),
+          getCoachMessage()
         ]);
 
         if (progressData.status === 'fulfilled') {
@@ -63,6 +65,9 @@ const StudentProfile = () => {
         if (objectiveInfoData.status === 'fulfilled') {
           setObjectiveInfo(objectiveInfoData.value);
         }
+        if (coachData.status === 'fulfilled') {
+          setCoachMessage(coachData.value);
+        }
       } catch (error) {
         console.error('Error loading profile data:', error);
       } finally {
@@ -71,19 +76,27 @@ const StudentProfile = () => {
     };
 
     loadProfileData();
-  }, [currentStudent]);
+  }, [currentStudent, getStudentProgress, getLearningObjectives, getCurrentObjectiveInfo, getCoachMessage]);
 
   if (!currentStudent) {
     return <div>Chargement...</div>;
   }
 
-  const handleSaveProfile = () => {
-    // Note: Dans une vraie application, vous appelleriez une API pour sauvegarder
-    toast({
-      title: "Profil mis à jour",
-      description: "Vos modifications ont été sauvegardées",
-    });
-    setIsEditing(false);
+  const handleSaveProfile = async () => {
+    try {
+      await updateStudentName(currentStudent.student_id, editedName.trim());
+      toast({
+        title: "Profil mis à jour",
+        description: "Vos modifications ont été sauvegardées",
+      });
+      setIsEditing(false);
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de sauvegarder les modifications",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCancelEdit = () => {
@@ -412,9 +425,87 @@ const StudentProfile = () => {
           </Card>
         </motion.div>
       )}
+
+      {/* Coach Personnel */}
+      {coachMessage && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7, duration: 0.5 }}
+        >
+          <Card className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-purple-200 dark:border-purple-700">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Brain className="w-5 h-5 text-purple-500" />
+                <span>Coach Personnel IA</span>
+              </CardTitle>
+              <CardDescription>
+                Votre assistant IA personnel vous accompagne
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Message principal */}
+              {coachMessage.message && (
+                <div className="p-4 bg-white/50 dark:bg-gray-800/50 rounded-lg">
+                  <AutoMathRenderer 
+                    text={coachMessage.message}
+                    className="text-purple-700 dark:text-purple-300 font-medium"
+                  />
+                </div>
+              )}
+
+              {/* Motivation */}
+              {coachMessage.motivation && (
+                <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg border-l-4 border-purple-400">
+                  <AutoMathRenderer 
+                    text={coachMessage.motivation}
+                    className="text-sm text-purple-600 dark:text-purple-400"
+                  />
+                </div>
+              )}
+
+              {/* Stratégie */}
+              {coachMessage.strategy && (
+                <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg border-l-4 border-blue-400">
+                  <AutoMathRenderer 
+                    text={coachMessage.strategy}
+                    className="text-sm text-blue-600 dark:text-blue-400"
+                  />
+                </div>
+              )}
+
+              {/* Conseil */}
+              {coachMessage.tip && (
+                <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg border-l-4 border-yellow-400">
+                  <AutoMathRenderer 
+                    text={coachMessage.tip}
+                    className="text-sm text-yellow-600 dark:text-yellow-400"
+                  />
+                </div>
+              )}
+
+              {/* Messages d'encouragement */}
+              {coachMessage.encouragement && coachMessage.encouragement.length > 0 && (
+                <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg border-l-4 border-green-400">
+                  <div className="space-y-2">
+                    {coachMessage.encouragement.map((message, index) => (
+                      <div key={index} className="flex items-start space-x-2">
+                        <div className="w-1.5 h-1.5 bg-green-400 rounded-full mt-2 flex-shrink-0" />
+                        <AutoMathRenderer 
+                          text={message}
+                          className="text-sm text-green-600 dark:text-green-400"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
     </div>
   );
 };
 
 export default StudentProfile;
-
